@@ -12,32 +12,30 @@ public class BLEBehaviour : MonoBehaviour
     public TMP_Text TextIsScanning, TextTargetDeviceConnection, TextTargetDeviceData, TextDiscoveredDevices;
     public Button ButtonStartScan;
     
-    // Change this to match your device.
-    string targetDeviceName = "Arduino";
-    string serviceUuid = "{19b10000-e8f2-537e-4f6c-d104768a1214}";
+    // Hard call to Prestan CPR Manakin
+    string targetDeviceName = "Prestan";
+    string serviceUuid = "{F000FEEA-6865-6172-7469-73656E7365AE}";
     string[] characteristicUuids = {
-        "{19b10001-e8f2-537e-4f6c-d104768a1214}",      // CUUID 1
-        //    "{00002a01-0000-1000-8000-00805f9b34fb}",       // CUUID 2
-        //   "{00002a57-0000-1000-8000-00805f9b34fb}",       // CUUID 3
+        "{F000FEEB-6865-6172-7469-73656E7365AE}",   //we just need the compression data  
     };
 
     BLE ble;
     BLE.BLEScan scan;
-    bool isScanning = false, isConnected = false;
+    bool isScanning = false, isConnected = false, isReading = false;
     string deviceId = null;  
     IDictionary<string, string> discoveredDevices = new Dictionary<string, string>();
     int devicesCount = 0;
     byte[] valuesToWrite;
+    public int compressionVal = 100;
 
     // BLE Threads 
-    Thread scanningThread, connectionThread, readingThread, writingThread;
+    Thread scanningThread, connectionThread, writingThread;
     
     void Start()
     {
         ble = new BLE();
         
         TextTargetDeviceConnection.text = targetDeviceName + " not found.";
-        //readingThread = new Thread(ReadBleData);
     }
 
     void Update()
@@ -78,6 +76,8 @@ public class BLEBehaviour : MonoBehaviour
                 TextTargetDeviceConnection.text = "Found target device:\n" + targetDeviceName;
             } 
         }
+
+
     }
     
     public void StartScanHandler()
@@ -92,6 +92,7 @@ public class BLEBehaviour : MonoBehaviour
         TextIsScanning.text +=
             $"Searching for {targetDeviceName} with \nservice {serviceUuid} and \ncharacteristic {characteristicUuids[0]}";
         TextDiscoveredDevices.text = "";
+        StartCoroutine(dataRead());
     }
     
     void ScanBleDevices()
@@ -174,14 +175,14 @@ public class BLEBehaviour : MonoBehaviour
                 TextTargetDeviceConnection.text = "Connected to target device:\n" + targetDeviceName;
                 break;
             case "writeData":
-                // if (!readingThread.IsAlive)
-                // {
+                //if (!readingThread.IsAlive)
+                //{
                 //     readingThread = new Thread(ReadBleData);
                 //     readingThread.Start();
-                // }
-                // if (remoteAngle != lastRemoteAngle)
+                //}
+                //if (remoteAngle != lastRemoteAngle)
                 // {
-                //     TextTargetDeviceData.text = "Remote angle: " + remoteAngle;
+                //   TextTargetDeviceData.text = "Remote angle: " + remoteAngle;
                 //     lastRemoteAngle = remoteAngle;
                 // }
                 break;
@@ -234,7 +235,7 @@ public class BLEBehaviour : MonoBehaviour
         writingThread = new Thread(WriteBleData);
         writingThread.Start();
     }
-    
+
     private void WriteBleData()
     {
         bool ok = BLE.WritePackage(deviceId,
@@ -246,14 +247,26 @@ public class BLEBehaviour : MonoBehaviour
         writingThread = null;
     }
     
-    private void ReadBleData(object obj)
+    public void ReadBleData()
     {
-        //byte[] packageReceived = BLE.ReadBytes();
-        // Convert little Endian.
-        // In this example we're interested about an angle
-        // value on the first field of our package.
-        // remoteAngle = packageReceived[0];
-        // Debug.Log("Angle: " + remoteAngle);
-        //Thread.Sleep(100);
+        isReading = true;
+        compressionVal = BLE.ReadPackage();
+        //if needing constant call just remove
+        //StartCoroutine(dataRead());
+
+    }
+
+    /*
+     * Use if needing constant calling else just use compression val into
+     */
+    private IEnumerator dataRead()
+    {
+        while (true)
+        {
+            compressionVal =  BLE.ReadPackage();
+            //best refresh rate before performance dips, dont mess with!!!
+            yield return new WaitForSeconds(.088f);
+            
+        }
     }
 }
